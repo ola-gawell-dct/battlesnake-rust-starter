@@ -13,9 +13,10 @@
 use log::info;
 use rand::seq::SliceRandom;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
-use crate::{Battlesnake, Board, Game};
+use crate::board_functions::{coord_in_direction, is_outside};
+use crate::models::{Direction, DirectionResult, Outcome};
+use crate::{Battlesnake, Board, Game, GameState, MoveResponse};
 
 // info is called when you create your Battlesnake on play.battlesnake.com
 // and controls your Battlesnake's appearance
@@ -42,60 +43,86 @@ pub fn end(_game: &Game, _turn: &i32, _board: &Board, _you: &Battlesnake) {
     info!("GAME OVER");
 }
 
+fn next_move(game_state: &GameState) -> MoveResponse {
+    let head = &game_state.you.body[0];
+
+    // Loop over all possible direction and evaluate it
+    let possible_directions = vec![
+        Direction::Up,
+        Direction::Left,
+        Direction::Down,
+        Direction::Right,
+    ];
+
+    // Map over all possible direction and return the DirectionResult
+    let direction_results: Vec<DirectionResult> = possible_directions.into_iter().map(|direction| {
+        let next_coord = coord_in_direction(head, &direction);
+        let is_out_of_bounds = is_outside(&next_coord, &game_state.board);
+        // Check that you don't collide with any snake
+        // Add more checks if needed
+
+        let outcome = if is_out_of_bounds {
+            Outcome::Dead
+        } else {
+            Outcome::Alive
+        };
+
+        // Collect data to use for sorting
+
+        // Defer direction to its own variable
+        DirectionResult { 
+            direction, 
+            outcome, 
+            other_data: 0 
+        }
+    }).collect();
+
+    // Filter out all safe moves
+    let safe_moves: Vec<DirectionResult> = direction_results
+        .into_iter()
+        .filter(|dir| dir.outcome == Outcome::Alive)
+        .collect::<Vec<DirectionResult>>();
+
+    if safe_moves.is_empty() {
+        println!(
+            "MOVE {}: No safe moves detected! Moving down",
+            game_state.turn
+        );
+        return MoveResponse {
+            direction: String::from("down"),
+            shout: None,
+        };
+    }
+
+    // Sort you safe moves any way you like
+    let next_move = safe_moves
+        .iter()
+        .max_by_key(|dir| dir.other_data)
+        .unwrap();
+
+    // Filter out all moves that are equally good
+    let best_move_score = next_move.other_data;
+    let equally_good_moves = safe_moves
+        .iter()
+        .filter(|dir| dir.other_data == best_move_score)
+        .collect::<Vec<&DirectionResult>>();
+
+    // Choose a random best move
+    let random_best_move = equally_good_moves
+        .choose(&mut rand::thread_rng())
+        .unwrap();
+
+    println!("MOVE {}: {}", game_state.turn, random_best_move.direction);
+    MoveResponse {
+        direction: random_best_move.direction.to_string().to_lowercase(),
+        shout: None,
+    }
+}
+
 // move is called on every turn and returns your next move
 // Valid moves are "up", "down", "left", or "right"
 // See https://docs.battlesnake.com/api/example-move for available data
-pub fn get_move(_game: &Game, turn: &i32, _board: &Board, you: &Battlesnake) -> Value {
-    
-    let mut is_move_safe: HashMap<_, _> = vec![
-        ("up", true),
-        ("down", true),
-        ("left", true),
-        ("right", true),
-    ]
-    .into_iter()
-    .collect();
-
-    // We've included code to prevent your Battlesnake from moving backwards
-    let my_head = &you.body[0]; // Coordinates of your head
-    let my_neck = &you.body[1]; // Coordinates of your "neck"
-    
-    if my_neck.x < my_head.x { // Neck is left of head, don't move left
-        is_move_safe.insert("left", false);
-
-    } else if my_neck.x > my_head.x { // Neck is right of head, don't move right
-        is_move_safe.insert("right", false);
-
-    } else if my_neck.y < my_head.y { // Neck is below head, don't move down
-        is_move_safe.insert("down", false);
-    
-    } else if my_neck.y > my_head.y { // Neck is above head, don't move up
-        is_move_safe.insert("up", false);
-    }
-
-    // TODO: Step 1 - Prevent your Battlesnake from moving out of bounds
-    // let board_width = &board.width;
-    // let board_height = &board.height;
-
-    // TODO: Step 2 - Prevent your Battlesnake from colliding with itself
-    // let my_body = &you.body;
-
-    // TODO: Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
-    // let opponents = &board.snakes;
-
-    // Are there any safe moves left?
-    let safe_moves = is_move_safe
-        .into_iter()
-        .filter(|&(_, v)| v)
-        .map(|(k, _)| k)
-        .collect::<Vec<_>>();
-    
-    // Choose a random move from the safe ones
-    let chosen = safe_moves.choose(&mut rand::thread_rng()).unwrap();
-
-    // TODO: Step 4 - Move towards food instead of random, to regain health and survive longer
-    // let food = &board.food;
-
-    info!("MOVE {}: {}", turn, chosen);
-    return json!({ "move": chosen });
+pub fn get_move(game_state: &GameState) -> Value {
+    let next_move = next_move(game_state);
+    return json!({ "move": next_move.direction });
 }
