@@ -14,7 +14,7 @@ use log::info;
 use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
 use serde_json::Value;
-use server_nano::json;
+use serde_json::json;
 
 use crate::board_functions::{coord_in_direction, is_outside};
 use crate::models::{Direction, DirectionResult, Outcome};
