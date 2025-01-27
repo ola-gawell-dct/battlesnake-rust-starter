@@ -1,14 +1,7 @@
-#[macro_use]
-extern crate rocket;
-
-use log::info;
-use rocket::fairing::AdHoc;
-use rocket::http::Status;
-use rocket::serde::{json::Json, Deserialize};
-use serde::Serialize;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use server_nano::Server;
 use std::collections::HashMap;
-use std::env;
 
 mod board_functions;
 mod logic;
@@ -66,6 +59,7 @@ pub struct MoveResponse {
     shout: Option<String>,
 }
 
+/* 
 #[get("/")]
 fn handle_index() -> Json<Value> {
     Json(logic::info())
@@ -95,8 +89,54 @@ fn handle_end(end_req: Json<GameState>) -> Status {
     logic::end(&end_req.game, &end_req.turn, &end_req.board, &end_req.you);
 
     Status::Ok
-}
+}*/
 
+fn main() {
+    let mut app = Server::new();
+
+    app.get("/", |_, res| {
+        let info = logic::info();
+        res.json(&info)
+    });
+
+    app.post("/start", |req, res| {
+        let json_body = req.json_body().unwrap();
+        // Convert from Value to GameState
+        let start_req: GameState = serde_json::from_value(json_body).unwrap();
+        logic::start(
+            &start_req.game,
+            &start_req.turn,
+            &start_req.board,
+            &start_req.you,
+        );
+        res.status_code(200, "OK");
+        res.send("OK")
+    });
+
+    app.post("/move", |req, res| {
+        let json_body = req.json_body().unwrap();
+        let game_state: GameState = serde_json::from_value(json_body).unwrap();
+        let move_response = logic::get_move(&game_state);
+        res.json(&move_response)
+    });
+
+    app.post("/end", |req, res| {
+        let json_body = req.json_body().unwrap();
+        // Convert from Value to GameState
+        let start_req: GameState = serde_json::from_value(json_body).unwrap();
+        logic::end(
+            &start_req.game,
+            &start_req.turn,
+            &start_req.board,
+            &start_req.you,
+        );
+        res.status_code(200, "OK");
+        res.send("OK")
+    });
+
+    app.listen("0.0.0.0:8000").unwrap();
+}
+/*
 #[launch]
 fn rocket() -> _ {
     // Lots of web hosting services expect you to bind to the port specified by the `PORT`
@@ -127,3 +167,4 @@ fn rocket() -> _ {
             routes![handle_index, handle_start, handle_move, handle_end],
         )
 }
+         */

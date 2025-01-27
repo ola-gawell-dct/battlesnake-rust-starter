@@ -11,8 +11,10 @@
 // For more info see docs.battlesnake.com
 
 use log::info;
-use rand::seq::SliceRandom;
-use serde_json::{json, Value};
+use rand::{Rng, SeedableRng};
+use rand::rngs::SmallRng;
+use serde_json::Value;
+use server_nano::json;
 
 use crate::board_functions::{coord_in_direction, is_outside};
 use crate::models::{Direction, DirectionResult, Outcome};
@@ -55,27 +57,31 @@ fn next_move(game_state: &GameState) -> MoveResponse {
     ];
 
     // Map over all possible direction and return the DirectionResult
-    let direction_results: Vec<DirectionResult> = possible_directions.into_iter().map(|direction| {
-        let next_coord = coord_in_direction(head, &direction);
-        let is_out_of_bounds = is_outside(&next_coord, &game_state.board);
-        // Check that you don't collide with any snake
-        // Add more checks if needed
+    let direction_results: Vec<DirectionResult> = possible_directions
+        .into_iter()
+        .map(|direction| {
+            let next_coord = coord_in_direction(head, &direction);
+            let is_out_of_bounds = is_outside(&next_coord, &game_state.board);
+            // Check that you don't collide with any snake
+            // Add more checks if needed
 
-        let outcome = if is_out_of_bounds {
-            Outcome::Dead
-        } else {
-            Outcome::Alive
-        };
+            let outcome = if is_out_of_bounds {
+                Outcome::Dead
+            } else {
+                Outcome::Alive
+            };
 
-        // Collect data to use for sorting
+            // Collect data to use for sorting
 
-        // Defer direction to its own variable
-        DirectionResult { 
-            direction, 
-            outcome, 
-            other_data: 0 
-        }
-    }).collect();
+            // Defer direction to its own variable
+            DirectionResult {
+                direction,
+                outcome,
+                other_data: 0,
+            }
+        })
+        .collect();
+
 
     // Filter out all safe moves
     let safe_moves: Vec<DirectionResult> = direction_results
@@ -95,10 +101,7 @@ fn next_move(game_state: &GameState) -> MoveResponse {
     }
 
     // Sort you safe moves any way you like
-    let next_move = safe_moves
-        .iter()
-        .max_by_key(|dir| dir.other_data)
-        .unwrap();
+    let next_move = safe_moves.iter().max_by_key(|dir| dir.other_data).unwrap();
 
     // Filter out all moves that are equally good
     let best_move_score = next_move.other_data;
@@ -107,10 +110,14 @@ fn next_move(game_state: &GameState) -> MoveResponse {
         .filter(|dir| dir.other_data == best_move_score)
         .collect::<Vec<&DirectionResult>>();
 
+    let mut small_rng = SmallRng::from_entropy();
     // Choose a random best move
-    let random_best_move = equally_good_moves
-        .choose(&mut rand::thread_rng())
-        .unwrap();
+    let random_best_move = if !equally_good_moves.is_empty() {
+        let index = small_rng.gen_range(0..equally_good_moves.len());
+        &equally_good_moves[index]
+    } else {
+        panic!("No equally good moves available");
+    };
 
     println!("MOVE {}: {}", game_state.turn, random_best_move.direction);
     MoveResponse {
