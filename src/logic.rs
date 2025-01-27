@@ -19,6 +19,7 @@ use serde_json::json;
 use crate::board_functions::{coord_in_direction, is_outside};
 use crate::models::{Direction, DirectionResult, Outcome};
 use crate::{Battlesnake, Board, Game, GameState, MoveResponse};
+use crate::reachable_cells::reachable_cells;
 
 // info is called when you create your Battlesnake on play.battlesnake.com
 // and controls your Battlesnake's appearance
@@ -71,6 +72,8 @@ fn next_move(game_state: &GameState) -> MoveResponse {
                 Outcome::Alive
             };
 
+            let reachable_cells = reachable_cells(&game_state.board, Some(&next_coord));
+
             // Collect data to use for sorting
 
             // Defer direction to its own variable
@@ -78,6 +81,7 @@ fn next_move(game_state: &GameState) -> MoveResponse {
                 direction,
                 outcome,
                 other_data: 0,
+                reachable_cells
             }
         })
         .collect();

@@ -29,5 +29,6 @@ pub struct DirectionResult {
     pub direction: Direction, 
     pub outcome: Outcome, 
     pub other_data: i32,
+    pub reachable_cells: usize,
 }
 

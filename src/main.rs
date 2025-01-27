@@ -8,6 +8,7 @@ use std::collections::HashMap;
 mod board_functions;
 mod logic;
 mod models;
+mod reachable_cells;
 
 // API and Response Objects
 // See https://docs.battlesnake.com/api
