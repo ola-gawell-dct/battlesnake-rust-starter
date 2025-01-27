@@ -134,7 +134,14 @@ fn main() {
         res.send("OK")
     });
 
-    app.listen("0.0.0.0:8000").unwrap();
+    // port from env::var("PORT") or 8000
+    let port: String = std::env::var("PORT")
+        .unwrap_or_else(|_| "8000".to_string())
+        .parse()
+        .expect("PORT must be a number");
+
+    let addr = format!("{}:{}", "0.0.0.0", port);
+    app.listen(&addr).unwrap();
 }
 /*
 #[launch]
